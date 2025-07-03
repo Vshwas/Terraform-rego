@@ -1,0 +1,44 @@
+trigger:
+- main  # Or your preferred branch
+
+pool:
+  vmImage: 'ubuntu-latest'
+
+variables:
+  terraformVersion: '1.5.7'  # Adjust if needed
+  azureServiceConnection: 'your-azure-service-connection-name'  # Set this in DevOps
+  backendResourceGroup: 'your-tfstate-rg'
+  backendStorageAccount: 'yourtfstateaccount'
+  backendContainer: 'tfstate'
+  backendKey: 'terraform.tfstate'
+
+steps:
+- task: UseTerraform@0
+  inputs:
+    terraformVersion: $(terraformVersion)
+
+- task: AzureCLI@2
+  inputs:
+    azureSubscription: $(azureServiceConnection)
+    scriptType: bash
+    scriptLocation: inlineScript
+    inlineScript: |
+      az account show
+
+- task: TerraformInstaller@1
+  inputs:
+    terraformVersion: $(terraformVersion)
+
+- script: |
+    terraform init \
+      -backend-config="resource_group_name=$(backendResourceGroup)" \
+      -backend-config="storage_account_name=$(backendStorageAccount)" \
+      -backend-config="container_name=$(backendContainer)" \
+      -backend-config="key=$(backendKey)"
+  displayName: 'Terraform Init'
+
+- script: terraform plan -out=tfplan
+  displayName: 'Terraform Plan'
+
+- script: terraform apply -auto-approve tfplan
+  displayName: 'Terraform Apply'
